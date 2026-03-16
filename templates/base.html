@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Smart City Complaints{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- Emergency Banner -->
+{% if active_emergencies is defined and active_emergencies > 0 %}
+<div class="emergency-banner" id="emergency-banner">
+  <span class="pulse-dot"></span>
+  🚨 {{ active_emergencies }} ACTIVE EMERGENCY COMPLAINT(S) REQUIRE IMMEDIATE ATTENTION
+</div>
+{% endif %}
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg">
+  <div class="container">
+    <a class="navbar-brand" href="{{ url_for('home') }}">
+       Smart<span>City</span> Hub
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('home') }}"><i class="fas fa-home me-1"></i>Home</a></li>
+
+        {% if session.get('admin_logged_in') %}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}"><i class="fas fa-chart-bar me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('analytics') }}"><i class="fas fa-chart-pie me-1"></i>Analytics</a></li>
+        <li class="nav-item">
+          <a class="nav-link position-relative" href="{{ url_for('notification_center') }}">
+            <i class="fas fa-bell me-1"></i>Notifications
+          </a>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('notification_settings') }}"><i class="fas fa-cog me-1"></i>Settings</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_logout') }}"><i class="fas fa-sign-out-alt me-1"></i>Logout</a></li>
+        {% else %}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_login') }}"><i class="fas fa-lock me-1"></i>Admin</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+
+
+{% block content %}{% endblock %}
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

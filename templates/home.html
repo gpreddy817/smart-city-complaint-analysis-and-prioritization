@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Smart City Hub - Home{% endblock %}
+
+{% block content %}
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <h1> Smart City Complaint System</h1>
+    <p>Report an issue. Get response.</p>
+    <a href="{{ url_for('submit_complaint') }}" class="btn btn-warning btn-lg fw-bold me-3">
+      <i class="fas fa-plus-circle me-2"></i>Report an Issue
+    </a>
+  </div>
+</section>
+
+
+
+<!-- Features -->
+  
+  <!-- How Our System Works -->
+  <div class="container my-5">
+    <div class="text-center mb-5">
+      <h3 class="fw-bold" style="color:var(--primary)"> How Our System Works</h3>
+      <p class="text-muted">Six intelligent systems working together behind every complaint</p>
+    </div>
+    <div class="row g-4">
+      {% set features = [
+        ('🔍', 'Text Classification', 'Automatically categorizes complaints into Roads, Water, Electricity, and more using TF-IDF + Logistic Regression trained on real civic data.'),
+        ('🎯', 'Priority Scoring', 'Calculates a 0–100 urgency score based on severity keywords, negative sentiment, duplicate reports, and complaint age.'),
+        ('🔗', 'Duplicate Detection', 'Uses TF-IDF cosine similarity (threshold 0.75) to identify repeated complaints from the same area, avoiding redundant processing.'),
+        ('🚨', 'Emergency Alerts', 'Instantly detects keywords like fire, gas leak, electric shock, flooding and triggers a RED ALERT with audio alarm on the dashboard.'),
+        ('📍', 'GPS Tracking', 'Captures precise latitude/longitude via the browser Geolocation API and pins every complaint on an interactive OpenStreetMap.'),
+        ('📧', 'Email Notifications', 'Automatically emails citizens a confirmation when their complaint is received, and again when it is resolved by the admin.'),
+      ] %}
+      {% for icon, title, desc in features %}
+      <div class="col-md-4">
+        <div class="about-feature-card h-100">
+          <div class="feature-icon">{{ icon }}</div>
+          <h5 class="fw-bold mt-3 mb-2" style="color:var(--primary)">{{ title }}</h5>
+          <p class="text-muted small mb-0">{{ desc }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+
+{% endblock %}

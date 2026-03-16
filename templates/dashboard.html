@@ -1,0 +1,357 @@
+{% extends 'base.html' %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" id="dashboard-page">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <div class="page-title"><i class="fas fa-table me-2" style="color:var(--primary);"></i>Complaints Dashboard</div>
+      <div class="page-sub">{{ complaints|length }} complaint(s) shown</div>
+    </div>
+    <div class="d-flex gap-2">
+      {% set map_complaints = complaints | selectattr('latitude') | list %}
+      {% if map_complaints %}
+      <button class="btn btn-outline-success btn-sm" onclick="openFullMap()">
+        <i class="fas fa-map me-1"></i>View All on Map ({{ map_complaints|length }})
+      </button>
+      {% endif %}
+      
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <form method="GET" class="row g-2 align-items-center">
+      <div class="col-md-3 col-6">
+        <select class="form-select form-select-sm" name="category">
+          <option value="">All Categories</option>
+          {% for cat in categories %}
+          <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 col-6">
+        <select class="form-select form-select-sm" name="priority">
+          <option value="">All Priority</option>
+          <option value="HIGH"   {% if filters.priority=='HIGH'   %}selected{% endif %}>HIGH</option>
+          <option value="MEDIUM" {% if filters.priority=='MEDIUM' %}selected{% endif %}>MEDIUM</option>
+          <option value="LOW"    {% if filters.priority=='LOW'    %}selected{% endif %}>LOW</option>
+        </select>
+      </div>
+      <div class="col-md-2 col-6">
+        <select class="form-select form-select-sm" name="status">
+          <option value="">All Status</option>
+          <option value="Pending"  {% if filters.status=='Pending'  %}selected{% endif %}>Pending</option>
+          <option value="Resolved" {% if filters.status=='Resolved' %}selected{% endif %}>Resolved</option>
+        </select>
+      </div>
+      <div class="col-md-2 col-6">
+        <select class="form-select form-select-sm" name="emergency">
+          <option value="">All</option>
+          <option value="1" {% if filters.emergency %}selected{% endif %}>Emergency Only</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-primary btn-sm me-1">
+          <i class="fas fa-filter me-1"></i>Filter
+        </button>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Table -->
+  {% if complaints %}
+  <div class="table-responsive mb-4">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Citizen</th>
+          <th>Category</th>
+          <th>Complaint</th>
+          <th>Location</th>
+          <th>Priority</th>
+          <th>Flags</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in complaints %}
+        <tr {% if c.is_emergency %}style="background:#fff5f5;"{% endif %}>
+          <td style="font-weight:700;color:var(--text);">#{{ c.id }}</td>
+          <td>
+            <div style="font-weight:600;font-size:0.875rem;color:var(--text);">{{ c.name }}</div>
+            <div style="font-size:0.75rem;color:var(--text3);">{{ c.phone or '' }}</div>
+          </td>
+          <td><span class="badge bg-info">{{ c.category }}</span></td>
+          <td>
+            <div style="font-size:0.83rem;color:var(--text2);max-width:220px;" title="{{ c.complaint_text }}">
+              {{ c.complaint_text[:70] }}{% if c.complaint_text|length > 70 %}...{% endif %}
+            </div>
+          </td>
+          <td style="max-width:200px;">
+            {% if c.address %}
+            <div style="font-size:0.82rem;font-weight:600;color:var(--text);">{{ c.address }}</div>
+            {% endif %}
+            {% if c.landmark %}
+            <div style="font-size:0.78rem;color:var(--text2);">📌 {{ c.landmark }}</div>
+            {% endif %}
+            {% if c.pincode %}
+            <div style="font-size:0.75rem;color:var(--text3);">PIN: {{ c.pincode }}</div>
+            {% endif %}
+            {% if not c.address and c.location_text %}
+            <div style="font-size:0.82rem;color:var(--text2);">{{ c.location_text }}</div>
+            {% endif %}
+            {% if c.latitude and c.longitude %}
+            <div style="font-size:0.72rem;color:var(--text3);">🌐 {{ '%.5f'|format(c.latitude) }}, {{ '%.5f'|format(c.longitude) }}</div>
+            <button onclick="openMapPopup({{ c.latitude }}, {{ c.longitude }}, {{ c.id }}, '{{ c.category }}', '{{ c.priority_label }}', '{{ (c.address or c.location_text or 'GPS Location') | replace("'","") }}', '{{ c.name | replace("'","") }}', '{{ c.status }}')"
+               style="background:none;border:none;padding:0;font-size:0.75rem;color:var(--primary);cursor:pointer;text-decoration:underline;">
+               🗺️ Show on Map
+            </button>
+            {% endif %}
+          </td>
+          <td>
+            {% if c.priority_label == 'HIGH' %}
+              <span class="badge bg-danger">HIGH</span>
+            {% elif c.priority_label == 'MEDIUM' %}
+              <span class="badge bg-warning">MEDIUM</span>
+            {% else %}
+              <span class="badge bg-success">LOW</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if c.is_emergency %}<span class="badge bg-danger d-block mb-1">🚨 Emergency</span>{% endif %}
+
+          </td>
+          <td>
+            {% if c.status == 'Resolved' %}
+              <span class="badge bg-success">Resolved</span>
+            {% else %}
+              <span class="badge bg-warning">Pending</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.78rem;color:var(--text3);white-space:nowrap;">{{ c.submitted_at[:10] }}</td>
+          <td>
+            {% if c.status != 'Resolved' %}
+            <form method="POST" action="{{ url_for('resolve_complaint', cid=c.id) }}"
+                  onsubmit="return confirm('Mark complaint #{{ c.id }} as resolved?')">
+              <button type="submit" class="btn btn-success btn-sm">Resolve</button>
+            </form>
+            {% else %}
+            <span style="font-size:0.75rem;color:var(--green);">✓ Done</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div style="text-align:center;padding:60px 20px;color:var(--text3);">
+    <i class="fas fa-inbox" style="font-size:2.5rem;margin-bottom:12px;display:block;"></i>
+    No complaints found matching your filters.
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ── Map Popup Modal ─────────────────────────────────────────────────────── -->
+<div id="map-modal-backdrop" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--bg,#fff);border-radius:12px;width:92%;max-width:780px;box-shadow:0 8px 40px rgba(0,0,0,0.25);overflow:hidden;position:relative;">
+
+    <!-- Modal Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border,#e2e8f0);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <i class="fas fa-map-marker-alt" style="color:var(--primary);font-size:1.1rem;"></i>
+        <div>
+          <div style="font-weight:700;font-size:0.95rem;color:var(--text);" id="map-modal-title">Complaint Location</div>
+          <div style="font-size:0.75rem;color:var(--text3);" id="map-modal-sub"></div>
+        </div>
+      </div>
+      <button onclick="closeMapModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text3);line-height:1;padding:0 4px;">&times;</button>
+    </div>
+
+    <!-- Info Strip -->
+    <div id="map-modal-info" style="display:flex;gap:16px;padding:10px 20px;background:var(--bg2,#f8f9fa);border-bottom:1px solid var(--border,#e2e8f0);flex-wrap:wrap;font-size:0.8rem;">
+    </div>
+
+    <!-- Map -->
+    <div id="modal-map" style="height:420px;width:100%;"></div>
+
+    <!-- Footer -->
+    <div style="padding:10px 20px;border-top:1px solid var(--border,#e2e8f0);display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:0.75rem;color:var(--text3);" id="map-modal-coords"></div>
+      <button onclick="closeMapModal()" class="btn btn-secondary btn-sm">Close</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Full Map Modal (all complaints) ────────────────────────────────────── -->
+<div id="fullmap-modal-backdrop" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9998;align-items:center;justify-content:center;">
+  <div style="background:var(--bg,#fff);border-radius:12px;width:95%;max-width:900px;box-shadow:0 8px 40px rgba(0,0,0,0.25);overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border,#e2e8f0);">
+      <div style="font-weight:700;font-size:0.95rem;color:var(--text);">
+        <i class="fas fa-map me-2" style="color:var(--primary);"></i>All Complaint Locations
+      </div>
+      <button onclick="closeFullMap()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text3);line-height:1;padding:0 4px;">&times;</button>
+    </div>
+    <div id="fullmap-map" style="height:500px;width:100%;"></div>
+    <div style="padding:10px 20px;border-top:1px solid var(--border,#e2e8f0);font-size:0.75rem;color:var(--text3);">
+      🔴 Emergency &nbsp;&nbsp; 🟠 HIGH &nbsp;&nbsp; 🟡 MEDIUM &nbsp;&nbsp; 🟢 LOW — Click any marker for details
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const allComplaints = {{ complaints | tojson }};
+const mapComplaints = allComplaints.filter(c => c.latitude && c.longitude);
+
+// ── Single complaint map popup ─────────────────────────────────────────────
+let modalMap    = null;
+let modalMarker = null;
+
+function openMapPopup(lat, lng, id, category, priority, location, name, status) {
+  // Set header info
+  document.getElementById('map-modal-title').textContent = '#' + id + ' — ' + category;
+  document.getElementById('map-modal-sub').textContent   = name + ' · ' + status;
+  document.getElementById('map-modal-coords').textContent = '📍 ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+
+  // Priority color
+  const color = priority === 'HIGH' ? '#dc2626' : priority === 'MEDIUM' ? '#d97706' : '#16a34a';
+
+  // Info strip
+  document.getElementById('map-modal-info').innerHTML = `
+    <span><strong>Location:</strong> ${location}</span>
+    <span><strong>Priority:</strong> <span style="color:${color};font-weight:700;">${priority}</span></span>
+    <span><strong>Status:</strong> ${status}</span>
+  `;
+
+  // Show modal
+  const backdrop = document.getElementById('map-modal-backdrop');
+  backdrop.style.display = 'flex';
+
+  // Init or update map
+  setTimeout(function() {
+    if (!modalMap) {
+      modalMap = L.map('modal-map').setView([lat, lng], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(modalMap);
+    } else {
+      if (modalMarker) modalMap.removeLayer(modalMarker);
+      modalMap.setView([lat, lng], 16);
+    }
+
+    const icon = L.divIcon({
+      html: `<div style="background:${color};color:#fff;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);">📍 #${id}</div>`,
+      className: '',
+      iconAnchor: [24, 12]
+    });
+
+    modalMarker = L.marker([lat, lng], { icon })
+      .addTo(modalMap)
+      .bindPopup(`
+        <div style="font-family:sans-serif;min-width:180px;">
+          <b style="color:${color}">#${id} — ${category}</b><br>
+          <b>Citizen:</b> ${name}<br>
+          <b>Location:</b> ${location}<br>
+          <b>Priority:</b> ${priority}<br>
+          <b>Status:</b> ${status}
+        </div>
+      `)
+      .openPopup();
+
+    modalMap.invalidateSize();
+  }, 100);
+}
+
+function closeMapModal() {
+  document.getElementById('map-modal-backdrop').style.display = 'none';
+}
+
+// Close on backdrop click
+document.getElementById('map-modal-backdrop').addEventListener('click', function(e) {
+  if (e.target === this) closeMapModal();
+});
+
+// ── Full map modal (all complaints) ───────────────────────────────────────
+let fullMap     = null;
+let fullMarkers = {};
+
+function openFullMap() {
+  document.getElementById('fullmap-modal-backdrop').style.display = 'flex';
+
+  setTimeout(function() {
+    if (!fullMap && mapComplaints.length > 0) {
+      fullMap = L.map('fullmap-map').setView([mapComplaints[0].latitude, mapComplaints[0].longitude], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(fullMap);
+
+      mapComplaints.forEach(function(c) {
+        const color = c.is_emergency ? '#dc2626'
+                    : c.priority_label === 'HIGH'   ? '#d97706'
+                    : c.priority_label === 'MEDIUM' ? '#ca8a04'
+                    : '#16a34a';
+
+        const icon = L.divIcon({
+          html: `<div style="background:${color};color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.2);">${c.is_emergency ? '🚨' : '📍'} #${c.id}</div>`,
+          className: '',
+          iconAnchor: [20, 10]
+        });
+
+        const m = L.marker([c.latitude, c.longitude], { icon })
+          .addTo(fullMap)
+          .bindPopup(`
+            <div style="font-family:sans-serif;min-width:180px;">
+              <b style="color:${color}">#${c.id} — ${c.category}</b><br>
+              <b>Location:</b> ${c.location_text || 'GPS Captured'}<br>
+              <b>Priority:</b> ${c.priority_label}<br>
+              <b>Status:</b> ${c.status}<br>
+              <hr style="margin:6px 0">
+              <small>${c.complaint_text.substring(0, 100)}...</small>
+            </div>
+          `);
+        fullMarkers[c.id] = m;
+      });
+
+      if (mapComplaints.length > 1) {
+        const group = L.featureGroup(Object.values(fullMarkers));
+        fullMap.fitBounds(group.getBounds().pad(0.1));
+      }
+    }
+
+    if (fullMap) fullMap.invalidateSize();
+  }, 100);
+}
+
+function closeFullMap() {
+  document.getElementById('fullmap-modal-backdrop').style.display = 'none';
+}
+
+document.getElementById('fullmap-modal-backdrop').addEventListener('click', function(e) {
+  if (e.target === this) closeFullMap();
+});
+
+// Close both modals on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeMapModal();
+    closeFullMap();
+  }
+});
+</script>
+{% endblock %}

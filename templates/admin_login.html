@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Admin Login{% endblock %}
+
+{% block content %}
+<div class="login-wrapper">
+  <div class="login-card">
+    <div class="text-center mb-4">
+      <div class="logo">🏙️</div>
+      <h3 class="fw-bold" style="color:var(--primary)">Admin Portal</h3>
+      <p class="text-muted">Smart City Complaint System</p>
+    </div>
+
+    <form method="POST">
+      <div class="mb-3">
+        <label class="form-label fw-bold"><i class="fas fa-user me-1"></i>Username</label>
+        <input type="text" class="form-control form-control-lg" name="username"
+               placeholder="Enter username" value="admin" required>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-bold"><i class="fas fa-lock me-1"></i>Password</label>
+        <input type="password" class="form-control form-control-lg" name="password"
+               placeholder="Enter password" required>
+      </div>
+      <button type="submit" class="btn btn-primary w-100 btn-lg">
+        <i class="fas fa-sign-in-alt me-2"></i>Login to Dashboard
+      </button>
+    </form>
+
+    <div class="text-center mt-4">
+      <small class="text-muted">Default: admin / admin123</small><br>
+      <a href="{{ url_for('home') }}" class="text-muted small">← Back to Home</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

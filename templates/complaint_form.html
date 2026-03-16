@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+{% block title %}Report a Complaint{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="form-card">
+    <h2><i class="fas fa-file-alt me-2" style="color:var(--primary)"></i>Report a City Issue</h2>
+    
+    <form method="POST" enctype="multipart/form-data" id="complaint-form" novalidate>
+
+      <!-- GPS Status -->
+      <div class="mb-3">
+        <div id="gps-status" class="gps-status pending">
+          <i class="fas fa-satellite-dish me-1"></i> Detecting GPS location...
+        </div>
+        <input type="hidden" id="latitude"  name="latitude">
+        <input type="hidden" id="longitude" name="longitude">
+      </div>
+
+      <div class="row g-3">
+
+        <!-- Full Name -->
+        <div class="col-md-6">
+          <label class="form-label">Full Name <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="name" id="name"
+                 placeholder="Your full name" required>
+          <div class="invalid-feedback">Full name is required.</div>
+        </div>
+
+        <!-- Phone Number -->
+        <div class="col-md-6">
+          <label class="form-label">Mobile Number <span class="text-danger">*</span></label>
+          <input type="tel" class="form-control" name="phone" id="phone"
+                 placeholder="10-digit mobile number" maxlength="10"
+                 pattern="[0-9]{10}" inputmode="numeric" required>
+          <div class="invalid-feedback" id="phone-error">Enter a valid 10-digit mobile number.</div>
+        </div>
+
+        <!-- Email -->
+        <div class="col-12">
+          <label class="form-label">
+            Email Address
+            <span class="badge bg-info ms-1" style="font-size:0.68rem;vertical-align:middle;">For notifications</span>
+          </label>
+          <input type="email" class="form-control" name="email" placeholder="yourname@gmail.com">
+          <div class="form-text"><i class="fas fa-bell me-1"></i>Write a correct email adress to get an email when your complaint is received and when it is resolved.</div>
+        </div>
+
+        <!-- Address -->
+        <div class="col-12">
+          <label class="form-label">Address <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="address" id="address"
+                 placeholder="e.g., 45 MG Road, Indiranagar" required>
+          <div class="invalid-feedback">Address is required.</div>
+        </div>
+
+        <!-- Landmark -->
+        <div class="col-md-8">
+          <label class="form-label">Landmark <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="landmark" id="landmark"
+                 placeholder="e.g., Near City Mall, Opposite Bus Stand" required>
+          <div class="invalid-feedback">Landmark is required.</div>
+        </div>
+
+        <!-- Pincode -->
+        <div class="col-md-4">
+          <label class="form-label">Pincode <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="pincode" id="pincode"
+                 placeholder="e.g., 560001" maxlength="6"
+                 pattern="[0-9]{6}" inputmode="numeric" required>
+          <div class="invalid-feedback" id="pincode-error">Enter a valid 6-digit pincode.</div>
+        </div>
+
+        <!-- Find on Map button (uses address + landmark + pincode combined) -->
+        <div class="col-12">
+          <button type="button" class="btn btn-outline-primary" id="geocode-btn" onclick="geocodeAddress()">
+            <i class="fas fa-search-location me-1"></i>Find on Map
+          </button>
+          <div class="form-text mt-1" id="geocode-status"></div>
+        </div>
+
+        <!-- Live Map Preview -->
+        <div class="col-12" id="map-preview-wrapper" style="display:none">
+          <label class="form-label">Location Preview</label>
+          <div id="map-preview" style="height:240px;border-radius:8px;border:1.5px solid var(--border);"></div>
+          <div class="form-text text-success mt-1" id="map-confirm-text"></div>
+        </div>
+
+        <!-- Complaint Text -->
+        <div class="col-12">
+          <label class="form-label">Describe the Issue <span class="text-danger">*</span></label>
+          <textarea class="form-control" id="complaint_text" name="complaint_text" rows="5"
+                    placeholder="Describe the problem in detail. E.g., 'Large pothole on main road near bus stop causing vehicle damage...'"
+                    required></textarea>
+          <div class="form-text"><span id="char-counter">0 characters</span> — minimum 20 characters</div>
+          <div class="invalid-feedback">Please describe the issue (minimum 20 characters).</div>
+        </div>
+
+        <!-- Image Upload -->
+        <div class="col-12">
+          <label class="form-label">Upload Photo (optional)</label>
+          <input type="file" class="form-control" name="image" accept="image/*">
+          <div class="form-text">Max 5MB. JPG, PNG, GIF accepted.</div>
+        </div>
+
+
+        <!-- Submit -->
+        <div class="col-12 text-center">
+          <button type="submit" class="btn btn-primary btn-lg px-5" id="submit-btn">
+            <i class="fas fa-paper-plane me-2"></i>Submit Complaint
+          </button>
+        </div>
+
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let previewMap = null;
+let previewMarker = null;
+
+// ── Phone: only allow digits, block alphabets ──────────────────────────────
+document.getElementById('phone').addEventListener('input', function () {
+  this.value = this.value.replace(/[^0-9]/g, '');
+  if (this.value.length === 10) {
+    this.classList.remove('is-invalid');
+    this.classList.add('is-valid');
+  } else {
+    this.classList.remove('is-valid');
+  }
+});
+
+document.getElementById('phone').addEventListener('keypress', function (e) {
+  if (!/[0-9]/.test(e.key)) e.preventDefault();
+});
+
+// ── Pincode: only allow digits ─────────────────────────────────────────────
+document.getElementById('pincode').addEventListener('input', function () {
+  this.value = this.value.replace(/[^0-9]/g, '');
+  if (this.value.length === 6) {
+    this.classList.remove('is-invalid');
+    this.classList.add('is-valid');
+  } else {
+    this.classList.remove('is-valid');
+  }
+});
+
+document.getElementById('pincode').addEventListener('keypress', function (e) {
+  if (!/[0-9]/.test(e.key)) e.preventDefault();
+});
+
+// ── Char counter for complaint text ───────────────────────────────────────
+document.getElementById('complaint_text').addEventListener('input', function () {
+  document.getElementById('char-counter').textContent = this.value.length + ' characters';
+});
+
+// ── Form validation before submit ─────────────────────────────────────────
+document.getElementById('complaint-form').addEventListener('submit', function (e) {
+  let valid = true;
+
+  // Phone validation
+  const phone = document.getElementById('phone');
+  if (!/^[0-9]{10}$/.test(phone.value.trim())) {
+    phone.classList.add('is-invalid');
+    document.getElementById('phone-error').textContent = 'Enter a valid 10-digit mobile number (digits only).';
+    valid = false;
+  } else {
+    phone.classList.remove('is-invalid');
+    phone.classList.add('is-valid');
+  }
+
+  // Pincode validation
+  const pincode = document.getElementById('pincode');
+  if (!/^[0-9]{6}$/.test(pincode.value.trim())) {
+    pincode.classList.add('is-invalid');
+    document.getElementById('pincode-error').textContent = 'Enter a valid 6-digit pincode (digits only).';
+    valid = false;
+  } else {
+    pincode.classList.remove('is-invalid');
+    pincode.classList.add('is-valid');
+  }
+
+  // Address validation
+  const address = document.getElementById('address');
+  if (!address.value.trim()) {
+    address.classList.add('is-invalid');
+    valid = false;
+  } else {
+    address.classList.remove('is-invalid');
+  }
+
+  // Landmark validation
+  const landmark = document.getElementById('landmark');
+  if (!landmark.value.trim()) {
+    landmark.classList.add('is-invalid');
+    valid = false;
+  } else {
+    landmark.classList.remove('is-invalid');
+  }
+
+  // Complaint text min length
+  const ct = document.getElementById('complaint_text');
+  if (ct.value.trim().length < 20) {
+    ct.classList.add('is-invalid');
+    valid = false;
+  } else {
+    ct.classList.remove('is-invalid');
+  }
+
+  if (!valid) {
+    e.preventDefault();
+    e.stopPropagation();
+    // Scroll to first invalid field
+    const first = document.querySelector('.is-invalid');
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+});
+
+// ── Geocode using address + landmark + pincode combined ────────────────────
+function geocodeAddress() {
+  const address  = document.getElementById('address').value.trim();
+  const landmark = document.getElementById('landmark').value.trim();
+  const pincode  = document.getElementById('pincode').value.trim();
+
+  if (!address) {
+    setGeocodeStatus('Please enter an address first.', '#d97706');
+    return;
+  }
+
+  const btn = document.getElementById('geocode-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Searching...';
+  setGeocodeStatus('Searching for location...', '#6b7280');
+
+  // Try queries from most specific to least specific (fallback strategy)
+  const queries = [
+    [address, landmark, pincode].filter(Boolean).join(', '),  // full query
+    [address, pincode].filter(Boolean).join(', '),             // address + pincode
+    [landmark, pincode].filter(Boolean).join(', '),            // landmark + pincode
+    pincode,                                                    // pincode only
+    address                                                     // address only
+  ].filter(Boolean);
+
+  tryGeocode(queries, 0, address, landmark, btn);
+}
+
+function tryGeocode(queries, index, address, landmark, btn) {
+  if (index >= queries.length) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-search-location me-1"></i>Find on Map';
+    setGeocodeStatus('❌ Location not found. Please check your address and pincode.', '#dc2626');
+    return;
+  }
+
+  const query = queries[index];
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&addressdetails=1&countrycodes=in`;
+
+  fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'SmartCityHub/1.0' } })
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.length > 0) {
+        // Found a result
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-search-location me-1"></i>Find on Map';
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        document.getElementById('latitude').value  = lat.toFixed(6);
+        document.getElementById('longitude').value = lng.toFixed(6);
+        setGeocodeStatus('✅ Location found — ' + data[0].display_name.substring(0, 90) + '...', '#16a34a');
+        showMapPreview(lat, lng, address + (landmark ? ', ' + landmark : ''));
+      } else {
+        // Try next fallback query
+        setTimeout(() => tryGeocode(queries, index + 1, address, landmark, btn), 300);
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-search-location me-1"></i>Find on Map';
+      setGeocodeStatus('❌ Could not connect. Check internet and try again.', '#dc2626');
+    });
+}
+
+function showMapPreview(lat, lng, label) {
+  document.getElementById('map-preview-wrapper').style.display = 'block';
+  if (!previewMap) {
+    previewMap = L.map('map-preview').setView([lat, lng], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(previewMap);
+  } else {
+    previewMap.setView([lat, lng], 16);
+    if (previewMarker) previewMap.removeLayer(previewMarker);
+  }
+  previewMarker = L.marker([lat, lng]).addTo(previewMap)
+    .bindPopup(`<b>📍 ${label}</b><br>Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`).openPopup();
+  document.getElementById('map-confirm-text').textContent =
+    `📍 Coordinates saved: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+function setGeocodeStatus(msg, color) {
+  const el = document.getElementById('geocode-status');
+  el.textContent = msg;
+  el.style.color = color;
+}
+</script>
+{% endblock %}

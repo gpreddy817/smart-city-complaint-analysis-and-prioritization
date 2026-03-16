@@ -1,0 +1,373 @@
+{% extends 'base.html' %}
+{% block title %}Notification Center{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <div class="page-title"><i class="fas fa-bell me-2" style="color:var(--primary);"></i>Notification Center</div>
+      
+    </div>
+    
+  </div>
+
+  {% if not settings.email_enabled %}
+  <div class="alert alert-warning mb-4">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Email notifications are disabled.</strong>
+    <a href="{{ url_for('notification_settings') }}" class="ms-2">Configure Gmail →</a>
+  </div>
+  {% else %}
+  
+  {% endif %}
+
+  <!-- All 4 cards clickable -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3" style="cursor:pointer;" onclick="filterTable('all')" title="View all sent emails">
+      <div class="stat-card success" id="card-all">
+        <div class="stat-icon"><i class="fas fa-paper-plane"></i></div>
+        <div><h2>{{ total_sent }}</h2><p>Emails Sent <i class="fas fa-eye ms-1" style="font-size:0.7rem;"></i></p></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3" style="cursor:pointer;" onclick="filterTable('failed')" title="View failed emails">
+      <div class="stat-card danger" id="card-failed">
+        <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+        <div><h2>{{ total_failed }}</h2><p>Failed <i class="fas fa-eye ms-1" style="font-size:0.7rem;"></i></p></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3" style="cursor:pointer;" onclick="filterTable('received')" title="View received confirmations">
+      <div class="stat-card" id="card-received">
+        <div class="stat-icon"><i class="fas fa-inbox"></i></div>
+        <div><h2>{{ received_sent }}</h2><p>Received Alerts <i class="fas fa-eye ms-1" style="font-size:0.7rem;"></i></p></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3" style="cursor:pointer;" onclick="filterTable('resolved')" title="View resolution alerts">
+      <div class="stat-card success" id="card-resolved">
+        <div class="stat-icon"><i class="fas fa-check-double"></i></div>
+        <div><h2>{{ resolved_sent }}</h2><p>Resolution Alerts <i class="fas fa-eye ms-1" style="font-size:0.7rem;"></i></p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card-panel">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 style="margin:0;">
+        <i class="fas fa-history me-2"></i>
+        <span id="table-title">Notification Log</span>
+        <span class="badge bg-secondary ms-2" id="count-badge" style="display:none;"></span>
+      </h6>
+      <button class="btn btn-outline-secondary btn-sm" id="show-all-btn" style="display:none;" onclick="resetTable()">
+        <i class="fas fa-list me-1"></i>Show All
+      </button>
+    </div>
+
+    <div id="no-results-msg" style="display:none;text-align:center;padding:30px;color:var(--text3);">
+      <i class="fas fa-inbox" style="font-size:2rem;margin-bottom:10px;display:block;"></i>
+      <span id="no-results-text">No records found.</span>
+    </div>
+
+    {% if notifications %}
+    <div class="table-responsive">
+      <table class="table table-hover" style="font-size:0.83rem;" id="notif-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Complaint</th><th>Citizen</th><th>Type</th>
+            <th>Sent To</th><th>Status</th><th>Details</th><th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for n in notifications %}
+          <tr class="notif-row"
+              data-success="{{ '1' if n.success else '0' }}"
+              data-type="{{ n.type }}"
+              style="cursor:pointer;"
+              onclick="showDetail('{{ n.id }}','{{ '1' if n.success else '0' }}','{{ n.recipient_email }}','{{ n.name or 'Unknown' }}','{{ n.complaint_id }}','{{ n.type }}','{{ n.category or '—' }}','{{ n.priority_label or '—' }}','{{ n.sent_at[:16] if n.sent_at else '' }}','{{ (n.message or '') | replace("'","") }}')"
+              {% if n.is_emergency is defined and n.is_emergency %}style="background:#fff5f5;cursor:pointer;"{% endif %}>
+            <td>{{ n.id }}</td>
+            <td>
+              <span style="font-weight:700;color:var(--text);">#{{ n.complaint_id }}</span><br>
+              <span style="font-size:0.72rem;color:var(--text3);">{{ n.category or '—' }}</span>
+            </td>
+            <td style="color:var(--text2);">{{ n.name or '—' }}</td>
+            <td>
+              {% if n.type == 'received' %}
+                <span class="badge bg-info">Received</span>
+              {% else %}
+                <span class="badge bg-success">Resolved</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.78rem;color:var(--text2);">{{ n.recipient_email }}</td>
+            <td>
+              {% if n.success %}
+                <span class="badge bg-success">✓ Sent</span>
+              {% else %}
+                <span class="badge bg-danger">✗ Failed</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.75rem;">
+              {% if not n.success %}
+                <span style="color:#dc2626;">{{ n.message[:55] if n.message else 'Unknown error' }}{% if n.message and n.message|length > 55 %}...{% endif %}</span>
+              {% else %}
+                <span style="color:var(--text3);">Delivered successfully</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.75rem;color:var(--text3);white-space:nowrap;">{{ n.sent_at[:16] if n.sent_at else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:40px;color:var(--text3);">
+      <i class="fas fa-bell-slash" style="font-size:2rem;margin-bottom:10px;display:block;"></i>
+      No notifications sent yet.
+      <div class="mt-3">
+        <a href="{{ url_for('notification_settings') }}" class="btn btn-primary btn-sm">
+          <i class="fas fa-cog me-1"></i>Configure Email
+        </a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div id="modal-backdrop" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--bg,#fff);border-radius:12px;padding:28px;max-width:540px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div id="modal-icon-wrap" style="border-radius:8px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;">
+          <i id="modal-icon" style="font-size:1.1rem;"></i>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:1rem;color:var(--text);" id="modal-title">Notification Details</div>
+          <div style="font-size:0.75rem;color:var(--text3);" id="modal-subtitle"></div>
+        </div>
+      </div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text3);line-height:1;padding:0 4px;">&times;</button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+
+      <div style="display:flex;gap:12px;padding:12px;background:var(--bg2,#f8f9fa);border-radius:8px;">
+        <i class="fas fa-user" style="color:var(--primary);margin-top:2px;min-width:16px;"></i>
+        <div>
+          <div style="font-size:0.7rem;font-weight:700;color:var(--text3);margin-bottom:2px;letter-spacing:0.05em;">CITIZEN NAME</div>
+          <div style="font-size:0.88rem;color:var(--text);" id="modal-citizen"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;padding:12px;background:var(--bg2,#f8f9fa);border-radius:8px;">
+        <i class="fas fa-envelope" style="color:var(--primary);margin-top:2px;min-width:16px;"></i>
+        <div>
+          <div style="font-size:0.7rem;font-weight:700;color:var(--text3);margin-bottom:2px;letter-spacing:0.05em;">EMAIL ADDRESS</div>
+          <div style="font-size:0.88rem;color:var(--text);" id="modal-email"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;padding:12px;background:var(--bg2,#f8f9fa);border-radius:8px;">
+        <i class="fas fa-file-alt" style="color:var(--primary);margin-top:2px;min-width:16px;"></i>
+        <div>
+          <div style="font-size:0.7rem;font-weight:700;color:var(--text3);margin-bottom:2px;letter-spacing:0.05em;">COMPLAINT</div>
+          <div style="font-size:0.88rem;color:var(--text);" id="modal-complaint"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;padding:12px;background:var(--bg2,#f8f9fa);border-radius:8px;">
+        <i class="fas fa-tag" style="color:var(--primary);margin-top:2px;min-width:16px;"></i>
+        <div>
+          <div style="font-size:0.7rem;font-weight:700;color:var(--text3);margin-bottom:2px;letter-spacing:0.05em;">NOTIFICATION TYPE</div>
+          <div style="font-size:0.88rem;color:var(--text);" id="modal-type"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;padding:12px;background:var(--bg2,#f8f9fa);border-radius:8px;">
+        <i class="fas fa-clock" style="color:var(--primary);margin-top:2px;min-width:16px;"></i>
+        <div>
+          <div style="font-size:0.7rem;font-weight:700;color:var(--text3);margin-bottom:2px;letter-spacing:0.05em;">TIME</div>
+          <div style="font-size:0.88rem;color:var(--text);" id="modal-time"></div>
+        </div>
+      </div>
+
+      <div id="modal-status-row" style="display:flex;gap:12px;padding:12px;border-radius:8px;border:1px solid;">
+        <i id="modal-status-icon" style="margin-top:2px;min-width:16px;"></i>
+        <div>
+          <div id="modal-status-label" style="font-size:0.7rem;font-weight:700;margin-bottom:4px;letter-spacing:0.05em;"></div>
+          <div style="font-size:0.85rem;word-break:break-word;" id="modal-status-msg"></div>
+        </div>
+      </div>
+
+      <div id="modal-fixes-wrap" style="display:none;padding:12px;background:#fffbeb;border-radius:8px;border:1px solid #fde68a;">
+        <div style="font-size:0.7rem;font-weight:700;color:#92400e;margin-bottom:6px;letter-spacing:0.05em;">
+          <i class="fas fa-lightbulb me-1"></i>POSSIBLE FIXES
+        </div>
+        <ul style="font-size:0.8rem;color:#78350f;margin:0;padding-left:16px;line-height:2;" id="modal-fixes"></ul>
+      </div>
+
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+      <a href="{{ url_for('notification_settings') }}" class="btn btn-outline-primary btn-sm" id="modal-settings-btn">
+        <i class="fas fa-cog me-1"></i>Email Settings
+      </a>
+      <button onclick="closeModal()" class="btn btn-secondary btn-sm">Close</button>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Filter table by card clicked ───────────────────────────────────────────
+function filterTable(filter) {
+  const rows   = document.querySelectorAll('.notif-row');
+  const table  = document.getElementById('notif-table');
+  const noMsg  = document.getElementById('no-results-msg');
+  const badge  = document.getElementById('count-badge');
+  const allBtn = document.getElementById('show-all-btn');
+  const title  = document.getElementById('table-title');
+
+  let count = 0;
+  rows.forEach(row => {
+    const success = row.dataset.success;
+    const type    = row.dataset.type;
+    let show = false;
+
+    if      (filter === 'all')      show = (success === '1');
+    else if (filter === 'failed')   show = (success === '0');
+    else if (filter === 'received') show = (type === 'received' && success === '1');
+    else if (filter === 'resolved') show = (type === 'resolved' && success === '1');
+
+    row.style.display = show ? '' : 'none';
+    if (show) count++;
+  });
+
+  const labels = {
+    'all':      'Emails Sent',
+    'failed':   'Failed Emails',
+    'received': 'Received Alerts',
+    'resolved': 'Resolution Alerts'
+  };
+  title.textContent  = labels[filter];
+  badge.textContent  = count + ' records';
+  badge.style.display = 'inline';
+  allBtn.style.display = 'inline-block';
+
+  if (count === 0) {
+    noMsg.style.display = 'block';
+    if (table) table.style.display = 'none';
+    const empty = {
+      'all':      'No emails sent yet.',
+      'failed':   'No failed emails — great!',
+      'received': 'No submission confirmation emails found.',
+      'resolved': 'No resolution alert emails found.'
+    };
+    document.getElementById('no-results-text').textContent = empty[filter];
+  } else {
+    noMsg.style.display = 'none';
+    if (table) table.style.display = '';
+  }
+}
+
+// ── Reset to show all ──────────────────────────────────────────────────────
+function resetTable() {
+  document.querySelectorAll('.notif-row').forEach(r => r.style.display = '');
+  document.getElementById('table-title').textContent   = 'Notification Log';
+  document.getElementById('count-badge').style.display  = 'none';
+  document.getElementById('show-all-btn').style.display  = 'none';
+  document.getElementById('no-results-msg').style.display = 'none';
+  const t = document.getElementById('notif-table');
+  if (t) t.style.display = '';
+}
+
+// ── Show detail modal ──────────────────────────────────────────────────────
+function showDetail(id, success, email, citizen, complaintId, type, category, priority, time, message) {
+  const ok = (success === '1');
+
+  document.getElementById('modal-subtitle').textContent  = 'Notification #' + id;
+  document.getElementById('modal-citizen').textContent   = citizen;
+  document.getElementById('modal-email').textContent     = email;
+  document.getElementById('modal-time').textContent      = time || '—';
+  document.getElementById('modal-complaint').textContent =
+    '#' + complaintId + ' — ' + (category !== '—' ? category : 'Unknown') +
+    (priority && priority !== '—' ? ' (' + priority + ' priority)' : '');
+  document.getElementById('modal-type').textContent =
+    type === 'received'
+      ? '📥 Submission Confirmation — sent when citizen submitted complaint'
+      : '✅ Resolution Alert — sent when admin marked complaint as resolved';
+
+  const iconWrap    = document.getElementById('modal-icon-wrap');
+  const icon        = document.getElementById('modal-icon');
+  const titleEl     = document.getElementById('modal-title');
+  const statusRow   = document.getElementById('modal-status-row');
+  const statusIcon  = document.getElementById('modal-status-icon');
+  const statusLbl   = document.getElementById('modal-status-label');
+  const statusMsg   = document.getElementById('modal-status-msg');
+  const fixesWrap   = document.getElementById('modal-fixes-wrap');
+  const settingsBtn = document.getElementById('modal-settings-btn');
+
+  if (ok) {
+    iconWrap.style.background   = '#f0fdf4';
+    icon.className              = 'fas fa-check-circle';
+    icon.style.color            = '#16a34a';
+    titleEl.textContent         = 'Email Delivered Successfully';
+    statusRow.style.background  = '#f0fdf4';
+    statusRow.style.borderColor = '#bbf7d0';
+    statusIcon.className        = 'fas fa-check-circle';
+    statusIcon.style.color      = '#16a34a';
+    statusLbl.textContent       = 'DELIVERY STATUS';
+    statusLbl.style.color       = '#166534';
+    statusMsg.textContent       = 'Email was delivered successfully to ' + email;
+    statusMsg.style.color       = '#166534';
+    fixesWrap.style.display     = 'none';
+    settingsBtn.textContent     = '';
+    settingsBtn.innerHTML       = '<i class="fas fa-cog me-1"></i>Email Settings';
+  } else {
+    iconWrap.style.background   = '#fef2f2';
+    icon.className              = 'fas fa-exclamation-circle';
+    icon.style.color            = '#dc2626';
+    titleEl.textContent         = 'Failed Email Details';
+    statusRow.style.background  = '#fef2f2';
+    statusRow.style.borderColor = '#fecaca';
+    statusIcon.className        = 'fas fa-times-circle';
+    statusIcon.style.color      = '#dc2626';
+    statusLbl.textContent       = 'FAILURE REASON';
+    statusLbl.style.color       = '#dc2626';
+    statusMsg.textContent       = message || 'No error details available.';
+    statusMsg.style.color       = '#7f1d1d';
+    fixesWrap.style.display     = 'block';
+
+    const fixes = document.getElementById('modal-fixes');
+    const r = (message || '').toLowerCase();
+    if (r.includes('authentication') || r.includes('password') || r.includes('535')) {
+      fixes.innerHTML = '<li><strong>Wrong App Password</strong> — re-enter Gmail App Password in Email Settings</li><li>Use a 16-character App Password, not your regular Gmail password</li><li>Enable 2-Step Verification on your Google Account first</li>';
+    } else if (r.includes('connection') || r.includes('timeout') || r.includes('refused')) {
+      fixes.innerHTML = '<li><strong>Network issue</strong> — check your internet connection</li><li>Gmail SMTP port 587 may be blocked on your network</li><li>Restart the app and try again</li>';
+    } else if (r.includes('recipient') || r.includes('invalid') || r.includes('550')) {
+      fixes.innerHTML = '<li><strong>Invalid email</strong> — citizen may have entered a wrong email address</li><li>Check the address above for typos</li>';
+    } else {
+      fixes.innerHTML = '<li>Check Gmail App Password in Email Settings</li><li>Make sure 2-Step Verification is enabled on Gmail</li><li>Verify the citizen email address is valid</li><li>Check your internet connection</li>';
+    }
+  }
+
+  document.getElementById('modal-backdrop').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modal-backdrop').style.display = 'none';
+}
+
+document.getElementById('modal-backdrop').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% block title %}Analytics - Smart City{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="fw-bold mb-0" style="color:var(--primary)">
+        <i class="fas fa-chart-pie me-2"></i>City Analytics
+      </h3>
+      <small class="text-muted">Insights from AI-processed complaints</small>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="row g-4 mb-4">
+    <div class="col-md-3 col-6">
+      <div class="analytics-card text-center">
+        <div class="kpi-number">{{ total }}</div>
+        <p class="text-muted fw-bold">Total Complaints</p>
+      </div>
+    </div>
+    <div class="col-md-3 col-6">
+      <div class="analytics-card text-center">
+        <div class="kpi-number text-danger">{{ high }}</div>
+        <p class="text-muted fw-bold">High Priority</p>
+      </div>
+    </div>
+    <div class="col-md-3 col-6">
+      <div class="analytics-card text-center">
+        <div class="kpi-number text-warning">{{ duplicates }}</div>
+        <p class="text-muted fw-bold">Duplicates Detected</p>
+      </div>
+    </div>
+    <div class="col-md-3 col-6">
+      <div class="analytics-card text-center">
+        <div class="kpi-number" style="color:var(--emergency)">{{ emergencies }}</div>
+        <p class="text-muted fw-bold">Emergencies</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <!-- Category Bar Chart -->
+    <div class="col-md-8">
+      <div class="analytics-card">
+        <h5><i class="fas fa-chart-bar me-2"></i>Complaints by Category</h5>
+        <canvas id="catChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Priority Pie -->
+    <div class="col-md-4">
+      <div class="analytics-card">
+        <h5><i class="fas fa-chart-pie me-2"></i>Priority Distribution</h5>
+        <canvas id="priChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <!-- Status Doughnut -->
+    <div class="col-md-4">
+      <div class="analytics-card">
+        <h5><i class="fas fa-circle-half-stroke me-2"></i>Resolution Status</h5>
+        <canvas id="statChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Insights -->
+    <div class="col-md-8">
+      <div class="analytics-card">
+        <h5><i class="fas fa-lightbulb me-2"></i>Key Insights</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="p-3 rounded" style="background:#f0f4f8">
+              <strong><i class="fas fa-trophy me-2 text-warning"></i>Most Reported Issue</strong>
+              <div class="kpi-number mt-1" style="font-size:1.4rem">{{ top_cat }}</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 rounded" style="background:#f0f4f8">
+              <strong><i class="fas fa-clock me-2 text-info"></i>Avg. Resolution Time</strong>
+              <div class="kpi-number mt-1" style="font-size:1.4rem">
+                {% if avg_res > 0 %}{{ avg_res }} hrs{% else %}N/A{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 rounded" style="background:#fff5f5">
+              <strong><i class="fas fa-exclamation-triangle me-2 text-danger"></i>Emergency Rate</strong>
+              <div class="kpi-number mt-1" style="font-size:1.4rem;color:var(--emergency)">
+                {% if total > 0 %}{{ ((emergencies / total) * 100) | round(1) }}%{% else %}0%{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 rounded" style="background:#fff8e1">
+              <strong><i class="fas fa-copy me-2 text-warning"></i>Duplicate Rate</strong>
+              <div class="kpi-number mt-1" style="font-size:1.4rem;color:#e67e00">
+                {% if total > 0 %}{{ ((duplicates / total) * 100) | round(1) }}%{% else %}0%{% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hotspot Locations -->
+  {% if hotspots %}
+  <div class="analytics-card">
+    <h5><i class="fas fa-map-pin me-2"></i>Complaint Hotspots (GPS Clusters)</h5>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover">
+        <thead><tr><th>#</th><th>Approx. Location</th><th>Lat, Lng</th><th>Complaint Count</th><th>Severity</th></tr></thead>
+        <tbody>
+          {% for spot in hotspots %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ spot.location_text or 'GPS Zone' }}</td>
+            <td><small>{{ spot.lat }}, {{ spot.lng }}</small></td>
+            <td><strong>{{ spot.count }}</strong></td>
+            <td>
+              {% if spot.count >= 5 %}
+                <span class="badge bg-danger">Hot Zone</span>
+              {% elif spot.count >= 3 %}
+                <span class="badge bg-warning text-dark">Medium</span>
+              {% else %}
+                <span class="badge bg-info">Low</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const catData = {{ cat_data | safe }};
+const priData = {{ pri_data | safe }};
+const statData = {{ stat_data | safe }};
+
+const catColors = ['#2e86de','#ff6b35','#28a745','#ffc107','#dc3545','#6f42c1','#17a2b8'];
+
+// Category Bar Chart
+new Chart(document.getElementById('catChart'), {
+  type: 'bar',
+  data: {
+    labels: catData.map(d => d.category),
+    datasets: [{
+      label: 'Number of Complaints',
+      data: catData.map(d => d.count),
+      backgroundColor: catColors,
+      borderRadius: 8
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+  }
+});
+
+// Priority Pie Chart
+new Chart(document.getElementById('priChart'), {
+  type: 'pie',
+  data: {
+    labels: priData.map(d => d.priority_label),
+    datasets: [{
+      data: priData.map(d => d.count),
+      backgroundColor: priData.map(d => d.priority_label === 'HIGH' ? '#dc3545' : d.priority_label === 'MEDIUM' ? '#ffc107' : '#28a745')
+    }]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+
+// Status Doughnut
+new Chart(document.getElementById('statChart'), {
+  type: 'doughnut',
+  data: {
+    labels: statData.map(d => d.status),
+    datasets: [{
+      data: statData.map(d => d.count),
+      backgroundColor: statData.map(d => d.status === 'Resolved' ? '#28a745' : '#ffc107')
+    }]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+</script>
+{% endblock %}
