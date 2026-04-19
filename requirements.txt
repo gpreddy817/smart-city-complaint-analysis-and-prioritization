@@ -1,6 +1,6 @@
 flask==3.0.0
 flask-login==0.6.3
-scikit-learn==1.7.2
+scikit-learn==1.40
 nltk==3.8.1
 numpy==1.26.3
 pandas==2.1.4
