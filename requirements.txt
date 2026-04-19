@@ -1,8 +1,8 @@
+flask==3.0.3
 flask-login==0.6.3
+gunicorn==21.2.0
+numpy==1.26.4
+pandas==2.2.2
 scikit-learn==1.4.0
 nltk==3.8.1
-flask==3.0.3
-pandas==2.2.2
-numpy==1.26.4
-gunicorn==21.2.0
 Werkzeug==3.0.1
